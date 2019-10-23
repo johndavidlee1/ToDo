@@ -6,171 +6,45 @@ import Paper from "@material-ui/core/Paper";
 import TextField from "@material-ui/core/TextField";
 import Button from "@material-ui/core/Button";
 import IconButton from "@material-ui/core/IconButton";
-import MenuIcon from "@material-ui/icons/Menu";
-import Drawer from "@material-ui/core/Drawer";
-import { Link } from "react-router-dom";
-import { auth } from "./firebase";
-
-export function SignIn(props) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(u => {
-      if (u) {
-        props.history.push("/app");
-      }
-      //do something
-    });
-    return unsubscribe;
-  }, [props.history]);
-
-  const handleSignIn = () => {
-    auth
-      .signInWithEmailAndPassword(email, password)
-      .then(() => {})
-      .catch(error => {
-        alert(error.message);
-      });
-  };
-
-  return (
-    <div>
-      <AppBar position="static" color="primary">
-        <Toolbar>
-          <Typography variant="h6" color="inherit">
-            Sign In
-          </Typography>
-        </Toolbar>
-      </AppBar>
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <Paper style={{ width: "480px", marginTop: "50px", padding: "30px" }}>
-          <TextField
-            placeholder="Email"
-            fullWidth={true}
-            value={email}
-            onChange={e => {
-              setEmail(e.target.value);
-            }}
-          />
-          <TextField
-            type="Password"
-            placeholder="Password"
-            fullWidth={true}
-            style={{ marginTop: "30px" }}
-            value={password}
-            onChange={e => {
-              setPassword(e.target.value);
-            }}
-          />
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginTop: "30px"
-            }}
-          >
-            <Typography>
-              Don't have an account? <Link to="/signup">Sign up!</Link>
-            </Typography>
-            <Button color="primary" variant="contained" onClick={handleSignIn}>
-              Sign In
-            </Button>
-          </div>
-        </Paper>
-      </div>
-    </div>
-  );
-}
-
-export function SignUp(props) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(u => {
-      if (u) {
-        props.history.push("/app");
-      }
-      //do something
-    });
-    return unsubscribe;
-  }, [props.history]);
-
-  const handleSignUp = () => {
-    auth
-      .createUserWithEmailAndPassword(email, password)
-      .then(() => {})
-      .catch(error => {
-        alert(error.message);
-      });
-  };
-  return (
-    <div>
-      <AppBar position="static" color="primary">
-        <Toolbar>
-          <Typography variant="h6" color="inherit">
-            Sign Up
-          </Typography>
-        </Toolbar>
-      </AppBar>
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <Paper style={{ width: "480px", marginTop: "50px", padding: "30px" }}>
-          <TextField
-            placeholder="Email"
-            fullWidth={true}
-            value={email}
-            onChange={e => {
-              setEmail(e.target.value);
-            }}
-          />
-          <TextField
-            type="password"
-            placeholder="Password"
-            fullWidth={true}
-            style={{ marginTop: "30px" }}
-            value={password}
-            onChange={e => {
-              setPassword(e.target.value);
-            }}
-          />
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginTop: "30px"
-            }}
-          >
-            <Typography>
-              Already have an account? <Link to="/">Sign In!</Link>
-            </Typography>
-            <Button color="primary" variant="contained" onClick={handleSignUp}>
-              Sign Up
-            </Button>
-          </div>
-        </Paper>
-      </div>
-    </div>
-  );
-}
+import List from "@material-ui/core/List";
+import ListItem from "@material-ui/core/ListItem";
+import ListItemIcon from "@material-ui/core/ListItemIcon";
+import ListItemSecondaryAction from "@material-ui/core/ListItemSecondaryAction";
+import ListItemText from "@material-ui/core/ListItemText";
+import Checkbox from "@material-ui/core/Checkbox";
+import DeleteIcon from "@material-ui/icons/Delete";
+import { auth, db } from "./firebase";
 
 export function App(props) {
-  const [drawer_open, setDrawerOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const [tasks, setTasks] = useState([]);
+  const [newTask, setNewTask] = useState("");
 
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(u => {
-      if (u) {
-        setUser(u);
-      } else {
-        props.history.push("/");
-      }
-      //do something
-    });
-    return unsubscribe;
-  }, [props.history]);
+  const addTask = () => {
+    db.collection("users")
+      .doc(user.uid)
+      .collection("tasks")
+      .add({ text: newTask, checked: "false" })
+      .then(() => {
+        setNewTask("");
+      });
+  };
+
+  const deleteTask = taskId => {
+    db.collection("users")
+      .doc(user.uid)
+      .collection("tasks")
+      .doc(taskId)
+      .delete();
+  };
+
+  const changeCheck = (checked, taskId) => {
+    db.collection("users")
+      .doc(user.uid)
+      .collection("tasks")
+      .doc(taskId)
+      .update({ checked: checked });
+  };
 
   const handleSignOut = () => {
     auth
@@ -179,49 +53,118 @@ export function App(props) {
         props.history.push("/");
       })
       .catch(error => {
-        alert(error.message);
+        console.log(error.message);
       });
   };
+
+  useEffect(() => {
+    let unsubscribe;
+
+    if (user) {
+      unsubscribe = db
+        .collection("users")
+        .doc(user.uid)
+        .collection("tasks")
+        .onSnapshot(snapshot => {
+          const updatedTasks = [];
+          snapshot.forEach(doc => {
+            const data = doc.data();
+            updatedTasks.push({
+              text: data.text,
+              checked: data.checked,
+              id: doc.id
+            });
+          });
+          setTasks(updatedTasks);
+        });
+    }
+    return unsubscribe;
+  }, [user]);
+  useEffect(() => {
+    const foo = auth.onAuthStateChanged(u => {
+      if (u) {
+        setUser(u);
+      } else {
+        props.history.push("/");
+      }
+    });
+    return foo;
+  }, [props.history]);
 
   if (!user) {
     return <div />;
   }
+
   return (
     <div>
-      <AppBar position="static" color="primary">
+      <AppBar position="static">
         <Toolbar>
-          <IconButton
-            color="inherit"
-            onClick={() => {
-              setDrawerOpen(true);
-            }}
-          >
-            <MenuIcon />
-          </IconButton>
           <Typography
-            variant="h6"
             color="inherit"
-            style={{ flexGrow: 1, marginLeft: "30px" }}
+            variant="h6"
+            style={{ marginLeft: 15, flexGrow: 1 }}
           >
-            My App
+            To Do List
           </Typography>
-          <Typography color="inherit" style={{ marginRight: "30px" }}>
-            Hi! {user.email}
+          <Typography color="inherit" style={{ marginRight: 30 }}>
+            {user.email}
           </Typography>
-          <Button color="inherit" onClick={handleSignOut}>
-            {" "}
+          <Button onClick={handleSignOut} color="inherit">
             Sign Out
           </Button>
         </Toolbar>
       </AppBar>
-      <Drawer
-        open={drawer_open}
-        onClose={() => {
-          setDrawerOpen(false);
-        }}
-      >
-        <div>Hello</div>
-      </Drawer>
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <Paper
+          style={{ maxWidth: 500, width: "100%", padding: 30, marginTop: 40 }}
+        >
+          <Typography variant="h6">To Do List</Typography>
+          <div style={{ display: "flex", marginTop: 30 }}>
+            <TextField
+              fullWidth
+              placeholder="Enter a task"
+              value={newTask}
+              onChange={event => {
+                setNewTask(event.target.value);
+              }}
+            />
+            <Button
+              variant="contained"
+              color="primary"
+              style={{ marginLeft: 30 }}
+              onClick={addTask}
+            >
+              Add
+            </Button>
+          </div>
+          <List style={{ marginTop: 30 }}>
+            {tasks.map(value => {
+              return (
+                <ListItem key={value.id}>
+                  <ListItemIcon>
+                    <Checkbox
+                      checked={value.complete}
+                      onChange={(e, checked) => {
+                        changeCheck(checked, value.id);
+                      }}
+                    />
+                  </ListItemIcon>
+                  <ListItemText primary={value.text} />
+                  <ListItemSecondaryAction>
+                    <IconButton
+                      onClick={() => {
+                        deleteTask(value.id);
+                      }}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </ListItemSecondaryAction>
+                </ListItem>
+              );
+            })}
+          </List>
+        </Paper>
+      </div>
     </div>
   );
 }
